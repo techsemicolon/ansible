@@ -792,6 +792,41 @@ class ELBListenerRules(object):
 
         return modified_rule
 
+    def compare_rules_based_on_rule_state(self):
+        """
+
+        :return:
+        """
+
+        rules_to_modify = []
+        rules_to_delete = []
+        rules_to_add = deepcopy(self.rules)
+    
+        # Mark rules to delete based on explicitely defined absent state
+        for new_rule in self.rules:
+            if new_rule['State'] == 'absent':
+                self.rules.remove(new_rule)
+                rules_to_delete.append(current_rule['RuleArn'])
+                rules_to_add.remove(new_rule)
+
+        for current_rule in self.current_rules:
+            current_rule_passed_to_module = False
+            for new_rule in self.rules[:]:
+                if current_rule['Priority'] == str(new_rule['Priority']):
+                    current_rule_passed_to_module = True
+                    # Remove what we match so that what is left can be marked as 'to be added'
+                    rules_to_add.remove(new_rule)
+                    modified_rule = self._compare_rule(current_rule, new_rule)
+                    if modified_rule:
+                        modified_rule['Priority'] = int(current_rule['Priority'])
+                        modified_rule['RuleArn'] = current_rule['RuleArn']
+                        modified_rule['Actions'] = new_rule['Actions']
+                        modified_rule['Conditions'] = new_rule['Conditions']
+                        rules_to_modify.append(modified_rule)
+                    break
+
+        return rules_to_add, rules_to_modify, rules_to_delete
+
     def compare_rules(self):
         """
 
